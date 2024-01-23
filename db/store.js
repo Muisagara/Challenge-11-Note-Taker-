@@ -1,47 +1,50 @@
 const util = require('util');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid'); // Use v4 from uuid
+const { v4: uuidv4 } = require('uuid');
 
 const readFileAsync = util.promisify(fs.readFile);
 const writeFileAsync = util.promisify(fs.writeFile);
 
 class Store {
-  read() {
-    return readFileAsync('db/db.json', 'utf8');
+  async read() {
+    try {
+      const notes = await readFileAsync('db/db.json', 'utf8');
+      return JSON.parse(notes) || [];
+    } catch (error) {
+      return [];
+    }
   }
 
-  write(notes) {
-    return writeFileAsync('db/db.json', JSON.stringify(notes));
+  async write(notes) {
+    await writeFileAsync('db/db.json', JSON.stringify(notes));
   }
 
-  getNotes() {
-    return this.read().then((notes) => {
-      let parsedNotes;
-      try {
-        parsedNotes = [].concat(JSON.parse(notes));
-      } catch (err) {
-        parsedNotes = [];
-      }
-      return parsedNotes;
-    });
+  async getNotes() {
+    try {
+      const notes = await this.read();
+      return notes;
+    } catch (error) {
+      return [];
+    }
   }
 
-  addNotes(note) {
+  async addNote(note) {
     const { title, text } = note;
     if (!title || !text) {
       throw new Error("Note 'title' and 'text' cannot be blank");
     }
+
     const newNote = { title, text, id: uuidv4() };
-    return this.getNotes()
-      .then((notes) => [...notes, newNote])
-      .then((updatedNotes) => this.write(updatedNotes))
-      .then(() => newNote);
+    const notes = await this.getNotes();
+    const updatedNotes = [...notes, newNote];
+    await this.write(updatedNotes);
+    return newNote;
   }
 
-  removeNotes(id) {
-    return this.getNotes()
-      .then((notes) => notes.filter((note) => note.id !== id))
-      .then((filteredNotes) => this.write(filteredNotes));
+  async removeNote(id) {
+    const notes = await this.getNotes();
+    const filteredNotes = notes.filter((note) => note.id !== id);
+    await this.write(filteredNotes);
   }
 }
 
